@@ -13,10 +13,26 @@ function FinancialEmailApp() {
     const [authCode, setAuthCode] = useState('');
     const [userProfile, setUserProfile] = useState(null);
     const [error, setError] = useState('');
+    
+    // Ollama AI state
+    const [ollamaConnected, setOllamaConnected] = useState(false);
+    const [availableModels, setAvailableModels] = useState([
+        { name: 'mistral:latest', size: 4.4e9 },
+        { name: 'phi3:latest', size: 2.2e9 },
+        { name: 'codellama:latest', size: 3.8e9 },
+        { name: 'llama3:latest', size: 4.7e9 },
+        { name: 'llama3.1:8b', size: 4.9e9 },
+        { name: 'gpt-oss:20b', size: 13e9 },
+        { name: 'gpt-oss:20b-trader', size: 13e9 }
+    ]);
+    const [selectedModel, setSelectedModel] = useState('mistral:latest');
+    const [processingMode, setProcessingMode] = useState('translate');
+    const [aiResult, setAiResult] = useState(null);
 
     // Initialize Gmail API on component mount
     useEffect(() => {
         initializeGmail();
+        initializeOllama();
     }, []);
 
     const initializeGmail = async () => {
@@ -47,6 +63,43 @@ function FinancialEmailApp() {
             setError('Error initializing Gmail: ' + err.message);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const initializeOllama = async () => {
+        try {
+            console.log('🤖 Initializing Ollama connection...');
+            const connectionResult = await window.ollamaAPI.checkConnection();
+            
+            if (connectionResult.success) {
+                setOllamaConnected(true);
+                const models = connectionResult.models || [];
+                setAvailableModels(models);
+                console.log('✅ Ollama connected successfully');
+                console.log('📋 Models loaded into React:', models.length);
+                
+                // Set a good default model based on what's available
+                if (models.length > 0) {
+                    // Prefer smaller, faster models first
+                    const preferredModel = models.find(m => m.name.includes('phi3')) ||
+                                         models.find(m => m.name.includes('mistral')) ||
+                                         models.find(m => m.name.includes('llama3.1')) ||
+                                         models.find(m => m.name.includes('llama3') && !m.name.includes('llama3.1')) ||
+                                         models[0];
+                    
+                    if (preferredModel) {
+                        setSelectedModel(preferredModel.name);
+                        await window.ollamaAPI.setModel(preferredModel.name);
+                        console.log(`🎯 Default model set to: ${preferredModel.name}`);
+                    }
+                }
+            } else {
+                setOllamaConnected(false);
+                console.log('⚠️ Ollama not available:', connectionResult.error);
+            }
+        } catch (error) {
+            console.error('❌ Ollama initialization failed:', error);
+            setOllamaConnected(false);
         }
     };
 
@@ -116,13 +169,32 @@ function FinancialEmailApp() {
     const handleProcessEmail = async () => {
         if (!selectedEmail) return;
         
-        setIsProcessing(true);
+        if (!ollamaConnected) {
+            alert('Ollama AI is not connected. Please make sure Ollama is running and try refreshing the page.');
+            return;
+        }
         
-        // Simulate AI processing for now (we'll connect Ollama in next step)
-        setTimeout(() => {
+        setIsProcessing(true);
+        setAiResult(null);
+        
+        try {
+            console.log(`🤖 Processing email with ${selectedModel} in ${processingMode} mode`);
+            
+            const result = await window.ollamaAPI.processEmail(selectedEmail, processingMode);
+            
+            if (result.success) {
+                setAiResult(result);
+                console.log('✅ AI processing completed successfully');
+            } else {
+                setError(`AI processing failed: ${result.error}`);
+                console.error('❌ AI processing failed:', result.error);
+            }
+        } catch (error) {
+            setError(`AI processing error: ${error.message}`);
+            console.error('❌ AI processing error:', error);
+        } finally {
             setIsProcessing(false);
-            alert(`Processing email: ${selectedEmail.subject}\n\nNext step: Connect to Ollama for real Dutch translation!`);
-        }, 2000);
+        }
     };
 
     const handleRefreshEmails = () => {
@@ -364,13 +436,160 @@ function FinancialEmailApp() {
                                     )}
                                 </div>
                                 
+                                {/* AI Processing Controls */}
+                                <div className="ai-processing-section">
+                                    <div className="ai-controls">
+                                        <div className="ai-status">
+                                            {ollamaConnected ? (
+                                                <span className="status-connected">✅ Ollama Connected</span>
+                                            ) : (
+                                                <span className="status-disconnected">❌ Ollama Disconnected</span>
+                                            )}
+                                        </div>
+                                        
+                                        {ollamaConnected && (
+                                            <div className="ai-options">
+                                                <div className="model-selector">
+                                                    <label>AI Model:</label>
+                                                    <select 
+                                                        value={selectedModel}
+                                                        onChange={(e) => {
+                                                            setSelectedModel(e.target.value);
+                                                            window.ollamaAPI.setModel(e.target.value);
+                                                        }}
+                                                        className="model-select"
+                                                    >
+                                                        {availableModels.length === 0 ? (
+                                                            <option value="">No models available</option>
+                                                        ) : (
+                                                            availableModels.map(model => (
+                                                                <option key={model.name} value={model.name}>
+                                                                    {model.name} ({(model.size / 1e9).toFixed(1)}GB)
+                                                                </option>
+                                                            ))
+                                                        )}
+                                                    </select>
+                                                </div>
+                                                
+                                                <div className="mode-selector">
+                                                    <label>Processing Mode:</label>
+                                                    <div className="mode-buttons">
+                                                        <button 
+                                                            className={`mode-btn ${processingMode === 'translate' ? 'active' : ''}`}
+                                                            onClick={() => setProcessingMode('translate')}
+                                                        >
+                                                            🔄 Translate
+                                                        </button>
+                                                        <button 
+                                                            className={`mode-btn ${processingMode === 'summarize' ? 'active' : ''}`}
+                                                            onClick={() => setProcessingMode('summarize')}
+                                                        >
+                                                            📄 Summarize
+                                                        </button>
+                                                        <button 
+                                                            className={`mode-btn ${processingMode === 'both' ? 'active' : ''}`}
+                                                            onClick={() => setProcessingMode('both')}
+                                                        >
+                                                            🤩 Both
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                
                                 <button 
                                     className="process-btn"
                                     onClick={handleProcessEmail}
-                                    disabled={isProcessing}
+                                    disabled={isProcessing || !ollamaConnected}
                                 >
                                     {isProcessing ? '🤖 Processing...' : '🤖 Process with AI'}
                                 </button>
+                                
+                                {/* AI Results Display */}
+                                {aiResult && (
+                                    <div className="ai-results">
+                                        <h3>🎉 AI Processing Results</h3>
+                                        
+                                        {aiResult.translation && (
+                                            <div className="ai-translation">
+                                                <h4>🔄 Translation ({aiResult.originalLanguage} → {aiResult.targetLanguage})</h4>
+                                                <div className="translation-content">
+                                                    {aiResult.translation.split('\n').map((line, index) => (
+                                                        <p key={index}>{line}</p>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {aiResult.analysis && (
+                                            <div className="ai-analysis">
+                                                <h4>📈 Enhanced Financial Analysis</h4>
+                                                <div className="analysis-content">
+                                                    {typeof aiResult.analysis === 'object' ? (
+                                                        <div>
+                                                            <div className="analysis-item">
+                                                                <strong>Executive Summary:</strong>
+                                                                <p>{aiResult.analysis.summary}</p>
+                                                            </div>
+                                                            <div className="analysis-item">
+                                                                <strong>Key Investment Insights:</strong>
+                                                                <p>{aiResult.analysis.keyInsights}</p>
+                                                            </div>
+                                                            <div className="analysis-item">
+                                                                <strong>Important Details & Actions:</strong>
+                                                                <p>{aiResult.analysis.importantDetails}</p>
+                                                            </div>
+                                                            {aiResult.analysis.investmentImplications && (
+                                                                <div className="analysis-item">
+                                                                    <strong>Investment Implications:</strong>
+                                                                    <p>{aiResult.analysis.investmentImplications}</p>
+                                                                </div>
+                                                            )}
+                                                            {aiResult.analysis.mentionedStocks && aiResult.analysis.mentionedStocks.length > 0 && (
+                                                                <div className="analysis-item">
+                                                                    <strong>Mentioned Securities:</strong>
+                                                                    <div className="stock-tags">
+                                                                        {aiResult.analysis.mentionedStocks.map((stock, index) => (
+                                                                            <span key={index} className="stock-tag">{stock}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {aiResult.analysis.riskFactors && (
+                                                                <div className="analysis-item risk-section">
+                                                                    <strong>⚠️ Risk Factors:</strong>
+                                                                    <p>{aiResult.analysis.riskFactors}</p>
+                                                                </div>
+                                                            )}
+                                                            <div className="analysis-item">
+                                                                <strong>Market Sentiment:</strong>
+                                                                <span className={`sentiment ${aiResult.analysis.sentiment}`}>
+                                                                    {aiResult.analysis.sentiment}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div>
+                                                            <p>{aiResult.analysis}</p>
+                                                            {aiResult.fullAnalysis && (
+                                                                <div className="full-analysis">
+                                                                    <strong>Detailed Analysis:</strong>
+                                                                    <div className="analysis-text">
+                                                                        {aiResult.fullAnalysis.split('\n').map((line, index) => (
+                                                                            <p key={index}>{line}</p>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : (

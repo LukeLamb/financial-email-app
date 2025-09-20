@@ -1,10 +1,21 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const GmailClient = require('./gmail-client');
+const OllamaClient = require('./ollama-client');
+
+// Add fetch polyfill for Node.js
+if (!globalThis.fetch) {
+    const { default: fetch, Request, Response, Headers } = require('node-fetch');
+    globalThis.fetch = fetch;
+    globalThis.Request = Request;
+    globalThis.Response = Response;
+    globalThis.Headers = Headers;
+}
 
 // Keep a global reference of the window object
 let mainWindow;
 let gmailClient;
+let ollamaClient;
 
 function createWindow() {
     // Create the browser window
@@ -35,7 +46,10 @@ function createWindow() {
 
     // Initialize Gmail client
     gmailClient = new GmailClient();
-
+    
+    // Initialize Ollama client
+    ollamaClient = new OllamaClient();
+    
     console.log('Financial Email App window created successfully!');
 }
 
@@ -90,6 +104,60 @@ ipcMain.handle('gmail:getUserProfile', async () => {
     try {
         const profile = await gmailClient.getUserProfile();
         return { success: true, profile };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// IPC Handlers for Ollama AI
+
+ipcMain.handle('ollama:checkConnection', async () => {
+    try {
+        return await ollamaClient.checkConnection();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('ollama:getModels', async () => {
+    try {
+        return await ollamaClient.getAvailableModels();
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('ollama:setModel', async (event, modelName) => {
+    try {
+        ollamaClient.setModel(modelName);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('ollama:processEmail', async (event, emailData, mode = 'translate') => {
+    try {
+        const result = await ollamaClient.processFinancialEmail(emailData, mode);
+        return result;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('ollama:translateEmail', async (event, content, fromLang = 'Dutch', toLang = 'English') => {
+    try {
+        const result = await ollamaClient.translateEmail(content, fromLang, toLang);
+        return result;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+ipcMain.handle('ollama:summarizeEmail', async (event, content, language = 'English') => {
+    try {
+        const result = await ollamaClient.summarizeEmail(content, language);
+        return result;
     } catch (error) {
         return { success: false, error: error.message };
     }

@@ -21,4 +21,26 @@ contextBridge.exposeInMainWorld('gmailAPI', {
     getUserProfile: () => ipcRenderer.invoke('gmail:getUserProfile')
 });
 
+// Expose Ollama AI functions to renderer process securely
+contextBridge.exposeInMainWorld('ollamaAPI', {
+    // Check Ollama connection and get available models
+    checkConnection: () => ipcRenderer.invoke('ollama:checkConnection'),
+    
+    // Get available Ollama models
+    getModels: () => ipcRenderer.invoke('ollama:getModels'),
+    
+    // Set the model to use for AI processing
+    setModel: (modelName) => ipcRenderer.invoke('ollama:setModel', modelName),
+    
+    // Process email with AI (translate, summarize, or both)
+    processEmail: (emailData, mode) => ipcRenderer.invoke('ollama:processEmail', emailData, mode),
+    
+    // Translate email content
+    translateEmail: (content, fromLang, toLang) => ipcRenderer.invoke('ollama:translateEmail', content, fromLang, toLang),
+    
+    // Summarize and analyze email content
+    summarizeEmail: (content, language) => ipcRenderer.invoke('ollama:summarizeEmail', content, language)
+});
+
 console.log('🔗 Gmail API bridge loaded');
+console.log('🤖 Ollama AI bridge loaded');
