@@ -9,3 +9,8 @@ node_modules/
 dist/
 *.tmp
 *.temp
+
+# Credentials and sensitive files
+src/credentials/credentials.json
+src/credentials/token.json
+exchange-token.js
