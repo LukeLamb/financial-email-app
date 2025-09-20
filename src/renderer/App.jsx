@@ -136,67 +136,109 @@ function FinancialEmailApp() {
         }
     };
 
+    const renderEmailList = () => {
+        if (emails.length === 0) {
+            return (
+                <div className="no-emails">
+                    <p>📭 No financial emails found</p>
+                    <p>Try refreshing or check your email filters</p>
+                </div>
+            );
+        }
+
+        return (
+            <>
+                {emails.map(email => (
+                    <button 
+                        key={email.id}
+                        className={`email-item ${selectedEmail?.id === email.id ? 'selected' : ''}`}
+                        onClick={() => handleEmailSelect(email)}
+                        type="button"
+                    >
+                        <div className="email-subject">{email.subject}</div>
+                        <div className="email-from">{email.from}</div>
+                        <div className="email-preview">{email.preview}</div>
+                        <div className="email-date">{email.date}</div>
+                    </button>
+                ))}
+            </>
+        );
+    };
+
+    // Function to render authentication content
+    const renderAuthContent = () => {
+        if (isLoading) {
+            return (
+                <div className="loading">
+                    <h2>🔄 Initializing Gmail API...</h2>
+                    <p>Please wait while we set up your connection.</p>
+                </div>
+            );
+        }
+        
+        if (authUrl) {
+            return (
+                <div className="auth-flow">
+                    <h2>🔐 Authorize Gmail Access</h2>
+                    <p>To access your financial emails, please authorize this app:</p>
+                    
+                    <button className="auth-btn" onClick={openAuthUrl}>
+                        🌐 Open Authorization Page
+                    </button>
+                    
+                    <div className="auth-instructions">
+                        <p><strong>Instructions:</strong></p>
+                        <ol>
+                            <li>Click the button above to open Google's authorization page</li>
+                            <li>Sign in to your Google account</li>
+                            <li>Grant permission to read your Gmail</li>
+                            <li>Copy the authorization code</li>
+                            <li>Paste it below and click "Complete Authentication"</li>
+                        </ol>
+                    </div>
+
+                    <div className="auth-code-input">
+                        <input
+                            type="text"
+                            placeholder="Paste authorization code here..."
+                            value={authCode}
+                            onChange={(e) => setAuthCode(e.target.value)}
+                            className="auth-input"
+                        />
+                        <button 
+                            className="complete-auth-btn"
+                            onClick={handleAuthentication}
+                            disabled={!authCode.trim()}
+                        >
+                            ✅ Complete Authentication
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        
+        return (
+            <div className="auth-error">
+                <h2>❌ Authentication Setup Failed</h2>
+                <p>Please check your credentials.json file and try again.</p>
+                <button className="retry-btn" onClick={initializeGmail}>
+                    🔄 Retry Setup
+                </button>
+            </div>
+        );
+    };
+
     // Authentication Screen
     if (!isAuthenticated) {
         return (
             <div className="app">
                 <header className="app-header">
-                    <h1>🇧🇪 Financial Email Assistant</h1>
+                    <h1>Financial Email Assistant</h1>
                     <p>Gmail Authentication Required</p>
                 </header>
 
                 <div className="auth-container">
-                    {isLoading ? (
-                        <div className="loading">
-                            <h2>🔄 Initializing Gmail API...</h2>
-                            <p>Please wait while we set up your connection.</p>
-                        </div>
-                    ) : authUrl ? (
-                        <div className="auth-flow">
-                            <h2>🔐 Authorize Gmail Access</h2>
-                            <p>To access your financial emails, please authorize this app:</p>
-                            
-                            <button className="auth-btn" onClick={openAuthUrl}>
-                                🌐 Open Authorization Page
-                            </button>
-                            
-                            <div className="auth-instructions">
-                                <p><strong>Instructions:</strong></p>
-                                <ol>
-                                    <li>Click the button above to open Google's authorization page</li>
-                                    <li>Sign in to your Google account</li>
-                                    <li>Grant permission to read your Gmail</li>
-                                    <li>Copy the authorization code</li>
-                                    <li>Paste it below and click "Complete Authentication"</li>
-                                </ol>
-                            </div>
-
-                            <div className="auth-code-input">
-                                <input
-                                    type="text"
-                                    placeholder="Paste authorization code here..."
-                                    value={authCode}
-                                    onChange={(e) => setAuthCode(e.target.value)}
-                                    className="auth-input"
-                                />
-                                <button 
-                                    className="complete-auth-btn"
-                                    onClick={handleAuthentication}
-                                    disabled={!authCode.trim()}
-                                >
-                                    ✅ Complete Authentication
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="auth-error">
-                            <h2>❌ Authentication Setup Failed</h2>
-                            <p>Please check your credentials.json file and try again.</p>
-                            <button className="retry-btn" onClick={initializeGmail}>
-                                🔄 Retry Setup
-                            </button>
-                        </div>
-                    )}
+                    {renderAuthContent()}
 
                     {error && (
                         <div className="error-message">
@@ -213,7 +255,7 @@ function FinancialEmailApp() {
     return (
         <div className="app">
             <header className="app-header">
-                <h1>🇧🇪 Financial Email Assistant</h1>
+                <h1>Financial Email Assistant</h1>
                 <p>Real Gmail Integration Active</p>
                 {userProfile && (
                     <div className="user-info">
@@ -225,7 +267,7 @@ function FinancialEmailApp() {
             <div className="app-content">
                 <div className="email-list">
                     <div className="email-list-header">
-                        <h2>📧 Financial Emails</h2>
+                        <h2>💰 Financial Emails ({emails.length})</h2>
                         <button 
                             className="refresh-btn" 
                             onClick={handleRefreshEmails}
@@ -234,30 +276,16 @@ function FinancialEmailApp() {
                             {isLoading ? '🔄' : '↻'} Refresh
                         </button>
                     </div>
-
-                    {isLoading ? (
-                        <div className="loading-emails">
-                            <p>🔄 Loading your financial emails...</p>
-                        </div>
-                    ) : emails.length === 0 ? (
-                        <div className="no-emails">
-                            <p>📭 No financial emails found</p>
-                            <p>Try refreshing or check your email filters</p>
-                        </div>
-                    ) : (
-                        emails.map(email => (
-                            <div 
-                                key={email.id}
-                                className={`email-item ${selectedEmail?.id === email.id ? 'selected' : ''}`}
-                                onClick={() => handleEmailSelect(email)}
-                            >
-                                <div className="email-subject">{email.subject}</div>
-                                <div className="email-from">{email.from}</div>
-                                <div className="email-preview">{email.preview}</div>
-                                <div className="email-date">{email.date}</div>
+                    
+                    <div className="email-items-container">
+                        {isLoading ? (
+                            <div className="loading-emails">
+                                <p>🔄 Loading your financial emails...</p>
                             </div>
-                        ))
-                    )}
+                        ) : (
+                            renderEmailList()
+                        )}
+                    </div>
                 </div>
 
                 <div className="email-details">
@@ -271,13 +299,66 @@ function FinancialEmailApp() {
                                 <div className="email-content">
                                     <p><strong>Preview:</strong></p>
                                     <p>{selectedEmail.preview}</p>
-                                    {selectedEmail.body && selectedEmail.body !== selectedEmail.preview && (
+                                    
+                                    {(selectedEmail.htmlBody || selectedEmail.plainTextBody) && (
                                         <details>
                                             <summary>View Full Email Content</summary>
-                                            <div className="full-email-body">
-                                                {selectedEmail.body.split('\n').map((line, index) => (
-                                                    <p key={index}>{line}</p>
-                                                ))}
+                                            <div className="full-email-content">
+                                                {selectedEmail.hasHtml && selectedEmail.hasPlainText && (
+                                                    <div className="content-format-selector">
+                                                        <button 
+                                                            className={`format-btn ${
+                                                                selectedEmail.viewMode === 'html' ? 'active' : ''
+                                                            }`}
+                                                            onClick={() => {
+                                                                setSelectedEmail({
+                                                                    ...selectedEmail, 
+                                                                    viewMode: 'html'
+                                                                });
+                                                            }}
+                                                        >
+                                                            📄 HTML Format
+                                                        </button>
+                                                        <button 
+                                                            className={`format-btn ${
+                                                                selectedEmail.viewMode === 'text' ? 'active' : ''
+                                                            }`}
+                                                            onClick={() => {
+                                                                setSelectedEmail({
+                                                                    ...selectedEmail, 
+                                                                    viewMode: 'text'
+                                                                });
+                                                            }}
+                                                        >
+                                                            📝 Plain Text
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
+                                                {selectedEmail.hasHtml && (!selectedEmail.viewMode || selectedEmail.viewMode === 'html') && (
+                                                    <div className="html-email-content">
+                                                        <div 
+                                                            className="html-email-body"
+                                                            dangerouslySetInnerHTML={{ 
+                                                                __html: selectedEmail.htmlBody 
+                                                            }}
+                                                        />
+                                                    </div>
+                                                )}
+                                                
+                                                {selectedEmail.hasPlainText && (selectedEmail.viewMode === 'text' || !selectedEmail.hasHtml) && (
+                                                    <div className="plain-text-email-content">
+                                                        <div className="plain-text-email-body">
+                                                            {selectedEmail.plainTextBody.split('\n').map((line, index) => (
+                                                                <p key={index}>{line}</p>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {!selectedEmail.hasHtml && !selectedEmail.hasPlainText && (
+                                                    <p className="no-content">No readable content available for this email.</p>
+                                                )}
                                             </div>
                                         </details>
                                     )}

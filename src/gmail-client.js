@@ -30,8 +30,14 @@ class GmailClient {
                 console.log('✅ Gmail API authenticated with saved token');
                 return true;
             } catch (err) {
-                // No saved token, need to authenticate
-                console.log('ℹ️ No saved token found, authentication required');
+                // Handle specific cases where token file doesn't exist or is invalid
+                if (err.code === 'ENOENT') {
+                    console.log('ℹ️ No saved token found, authentication required');
+                } else if (err instanceof SyntaxError) {
+                    console.log('ℹ️ Invalid token file format, authentication required');
+                } else {
+                    console.error('❌ Error reading token file:', err.message);
+                }
                 return false;
             }
             
@@ -82,6 +88,8 @@ class GmailClient {
             // Search for financial emails
             const query = 'from:(bolero.be OR kbc.be OR ing.be OR belfius.be) OR subject:(beurs OR markt OR portfolio OR investering)';
             
+            console.log(`🔍 Searching for emails with query: ${query}`);
+            
             const response = await this.gmail.users.messages.list({
                 userId: 'me',
                 q: query,
@@ -89,21 +97,31 @@ class GmailClient {
             });
 
             const messages = response.data.messages || [];
+            console.log(`📨 Found ${messages.length} message IDs`);
             
             // Get detailed message data
-            const emails = await Promise.all(
-                messages.map(async (message) => {
+            const emails = [];
+            for (let i = 0; i < messages.length; i++) {
+                try {
                     const emailData = await this.gmail.users.messages.get({
                         userId: 'me',
-                        id: message.id,
+                        id: messages[i].id,
                         format: 'full',
                     });
 
-                    return this.parseEmailData(emailData.data);
-                })
-            );
+                    const parsedEmail = this.parseEmailData(emailData.data);
+                    if (parsedEmail.subject && parsedEmail.from) {
+                        emails.push(parsedEmail);
+                        console.log(`✅ Email ${i + 1}: ${parsedEmail.subject.substring(0, 50)}...`);
+                    } else {
+                        console.log(`⚠️ Email ${i + 1}: Missing subject or from field`);
+                    }
+                } catch (error) {
+                    console.error(`❌ Error parsing email ${i + 1}:`, error.message);
+                }
+            }
 
-            console.log(`✅ Retrieved ${emails.length} financial emails`);
+            console.log(`✅ Successfully retrieved ${emails.length} out of ${messages.length} financial emails`);
             return emails;
 
         } catch (error) {
@@ -121,23 +139,52 @@ class GmailClient {
             return header ? header.value : '';
         };
 
-        // Extract email body
-        let body = '';
-        if (emailData.payload.body.data) {
-            body = Buffer.from(emailData.payload.body.data, 'base64').toString();
-        } else if (emailData.payload.parts) {
-            // Handle multipart emails
-            for (const part of emailData.payload.parts) {
+        // Extract email body (both plain text and HTML)
+        let plainTextBody = '';
+        let htmlBody = '';
+        
+        const extractBodyFromParts = (parts) => {
+            for (const part of parts) {
                 if (part.mimeType === 'text/plain' && part.body.data) {
-                    body = Buffer.from(part.body.data, 'base64').toString();
-                    break;
+                    plainTextBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
+                } else if (part.mimeType === 'text/html' && part.body.data) {
+                    htmlBody = Buffer.from(part.body.data, 'base64').toString('utf-8');
+                } else if (part.parts) {
+                    // Recursively handle nested parts (multipart/alternative, etc.)
+                    extractBodyFromParts(part.parts);
                 }
             }
+        };
+
+        // Handle single part emails
+        if (emailData.payload.body.data) {
+            if (emailData.payload.mimeType === 'text/html') {
+                htmlBody = Buffer.from(emailData.payload.body.data, 'base64').toString('utf-8');
+            } else {
+                plainTextBody = Buffer.from(emailData.payload.body.data, 'base64').toString('utf-8');
+            }
+        } else if (emailData.payload.parts) {
+            // Handle multipart emails
+            extractBodyFromParts(emailData.payload.parts);
         }
 
-        // Clean up the body text
-        body = body.replace(/\r\n/g, '\n').trim();
-        const preview = body.substring(0, 200) + (body.length > 200 ? '...' : '');
+        // Clean up the text bodies
+        plainTextBody = plainTextBody.replace(/\r\n/g, '\n').trim();
+        htmlBody = htmlBody.trim();
+        
+        // Create preview from available content
+        let preview = '';
+        if (plainTextBody) {
+            preview = plainTextBody.substring(0, 200) + (plainTextBody.length > 200 ? '...' : '');
+        } else if (htmlBody) {
+            // Strip HTML tags for preview
+            const strippedHtml = htmlBody.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            preview = strippedHtml.substring(0, 200) + (strippedHtml.length > 200 ? '...' : '');
+        }
+
+        console.log(`📧 Email: ${getHeader('Subject')}`);
+        console.log(`   Plain text: ${plainTextBody ? 'Yes' : 'No'} (${plainTextBody.length} chars)`);
+        console.log(`   HTML: ${htmlBody ? 'Yes' : 'No'} (${htmlBody.length} chars)`);
 
         return {
             id: emailData.id,
@@ -145,7 +192,10 @@ class GmailClient {
             from: getHeader('From'),
             date: new Date(parseInt(emailData.internalDate)).toISOString().split('T')[0],
             preview: preview,
-            body: body,
+            plainTextBody: plainTextBody,
+            htmlBody: htmlBody,
+            hasHtml: !!htmlBody,
+            hasPlainText: !!plainTextBody,
             isFinancial: true,
             labels: emailData.labelIds || [],
             threadId: emailData.threadId

@@ -13,7 +13,7 @@ This folder will contain your Google API credentials:
 
 The `.gitignore` file already excludes this entire folder, but be extra careful:
 
-1. Never share `credentials.json` 
+1. Never share `credentials.json`
 2. Never commit `token.json`
 3. Keep these files secure and backed up separately
 
@@ -27,7 +27,7 @@ The `.gitignore` file already excludes this entire folder, but be extra careful:
 
 ## File Structure
 
-```
+```bash
 src/credentials/
 ├── credentials.json    # Your OAuth client credentials (you create this)
 ├── token.json         # Access token (automatically created)
