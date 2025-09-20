@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Build outputs
+src/renderer/dist/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Electron build outputs
+dist/
+out/
+
+# Knowledge graph database
+knowledge-graph.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# API credentials (keep these secure!)
+credentials/
+*.json
+!package*.json
+
+# Development files
+.eslintcache

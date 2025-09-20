@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a desktop financial email processing application built with Electron and React. The app processes Belgian financial emails (primarily from Bolero, KBC, and other financial institutions) and is designed to integrate with AI for email analysis and translation.
+Financial Email Assistant - a desktop application built with Electron + React that processes Belgian financial emails using local AI (Ollama) for Dutch-to-English translation and analysis.
 
 ## Development Commands
 
@@ -14,12 +14,13 @@ This is a desktop financial email processing application built with Electron and
 - `npm run watch-react` - Build React in watch mode (auto-rebuild on changes)
 - `npm run dev-full` - Run both watch-react and dev concurrently
 
-## Architecture
+## Architecture Overview
 
 ### Main Process (Electron)
 
 - `src/main.js` - Electron main process that creates the desktop window (1200x800)
 - Uses `nodeIntegration: true` and `contextIsolation: false` for direct Node.js access
+- Auto-opens DevTools when `--dev` flag is present
 
 ### Renderer Process (React)
 
@@ -35,42 +36,37 @@ This is a desktop financial email processing application built with Electron and
 - Output: `src/renderer/dist/app.js`
 - Target: `electron-renderer`
 
-## Current State
+## Current Implementation
 
-The app currently displays sample Belgian financial emails and simulates AI processing. Key features implemented:
+The app currently displays sample Belgian financial emails (Bolero, KBC) and simulates AI processing. Key features:
 
-- Email list with selection functionality
-- Email detail view
-- Simulated AI processing with 2-second delay
-- Modern financial dashboard UI with gradients
-
-## Next Steps (from documentation)
-
-The guides indicate planned integration of:
-
-1. Gmail API for real email data
-2. Ollama AI for actual Dutch/English translation
-3. Real-time email processing
+- Email list with selection functionality using React state management
+- Email detail view with processing simulation (2-second delay)
+- Modern financial dashboard UI with gradients and responsive design
 
 ## Development Workflow
 
 1. Make React changes in `src/renderer/`
-2. Run `npm run build-react` or `npm run watch-react`
+2. Run `npm run build-react` or `npm run watch-react` to compile
 3. Run `npm run dev` to test in Electron with DevTools
-4. The app auto-opens DevTools when `--dev` flag is present
+4. React state is managed with useState hooks for email selection and processing status
 
-## File Structure
+## Planned Integrations
+
+Next steps include Gmail API for real email data and Ollama AI for actual Dutch/English translation processing.
+
+## File Structure Context
 
 ```bash
 financial-email-app/
 ├── src/
 │   ├── main.js              # Electron main process
 │   └── renderer/
-│       ├── App.jsx          # Main React component
+│       ├── App.jsx          # Main React component with email state
 │       ├── index.html       # HTML shell
-│       ├── styles.css       # App styling
+│       ├── styles.css       # Modern financial UI styling
 │       └── dist/            # Webpack build output
 ├── webpack.config.js        # React build configuration
-├── package.json            # Dependencies and scripts
-└── icons/                  # App icons (referenced but not analyzed)
+├── package.json            # Dependencies and npm scripts
+└── icons/                  # App icons and branding
 ```
